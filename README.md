@@ -124,11 +124,11 @@ wrk -t4 -c100 -d30s http://localhost:8080/hello.html
 Running 1m test @ http://localhost:8080/
   4 threads and 100 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency    12.95ms   85.59ms 942.25ms   97.53%
-    Req/Sec    51.67k     6.82k   69.66k    87.65%
-  12377486 requests in 1.03m, 0.90GB read
-Requests/sec: 200297.32
-Transfer/sec:     14.90MB
+    Latency    17.59ms  110.09ms   1.14s    97.18%
+    Req/Sec    67.33k     6.89k   83.10k    79.40%
+  16150106 requests in 1.04m, 1.17GB read
+Requests/sec: 259536.61
+Transfer/sec:     19.31MB
 ```
 
 ## Architecture

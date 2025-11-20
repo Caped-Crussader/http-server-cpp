@@ -11,7 +11,6 @@
 #include <chrono>
 #include <functional>
 #include <map>
-#include <random>
 #include <string>
 #include <thread>
 #include <utility>
@@ -82,8 +81,6 @@ class HttpServer {
   int worker_epoll_fd_[kThreadPoolSize];
   epoll_event worker_events_[kThreadPoolSize][kMaxEvents];
   std::map<Uri, std::map<HttpMethod, HttpRequestHandler_t>> request_handlers_;
-  std::mt19937 rng_;
-  std::uniform_int_distribution<int> sleep_times_;
 
   void CreateSocket();
   void SetUpEpoll();
