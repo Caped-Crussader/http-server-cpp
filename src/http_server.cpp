@@ -199,7 +199,7 @@ void HttpServer::HandleEpollEvent(int epoll_fd, EventData *data,
       }
     } else {
       if (errno == EAGAIN || errno == EWOULDBLOCK) {  // retry
-        control_epoll_event(epoll_fd, EPOLL_CTL_ADD, fd, EPOLLOUT, response);
+        control_epoll_event(epoll_fd, EPOLL_CTL_MOD, fd, EPOLLOUT, response);
       } else {  // other error
         control_epoll_event(epoll_fd, EPOLL_CTL_DEL, fd);
         close(fd);
@@ -232,8 +232,9 @@ void HttpServer::HandleHttpData(const EventData &raw_request,
   // Set response to write to client
   response_string =
       to_string(http_response, http_request.method() != HttpMethod::HEAD);
-  memcpy(raw_response->buffer, response_string.c_str(), kMaxBufferSize);
-  raw_response->length = response_string.length();
+  size_t copy_length = std::min(response_string.length(), kMaxBufferSize);
+  memcpy(raw_response->buffer, response_string.c_str(), copy_length);
+  raw_response->length = copy_length;
 }
 
 HttpResponse HttpServer::HandleHttpRequest(const HttpRequest &request) {
