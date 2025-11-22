@@ -63,12 +63,13 @@ void HttpServer::Start() {
 
 void HttpServer::Stop() {
   running_ = false;
+  // Close epoll file descriptors to wake up blocked worker threads
+  for (int i = 0; i < kThreadPoolSize; i++) {
+    close(worker_epoll_fd_[i]);
+  }
   listener_thread_.join();
   for (int i = 0; i < kThreadPoolSize; i++) {
     worker_threads_[i].join();
-  }
-  for (int i = 0; i < kThreadPoolSize; i++) {
-    close(worker_epoll_fd_[i]);
   }
   close(sock_fd_);
 }
@@ -109,8 +110,14 @@ void HttpServer::Listen() {
 
     client_data = new EventData();
     client_data->fd = client_fd;
-    control_epoll_event(worker_epoll_fd_[current_worker], EPOLL_CTL_ADD,
-                        client_fd, EPOLLIN, client_data);
+    try {
+      control_epoll_event(worker_epoll_fd_[current_worker], EPOLL_CTL_ADD,
+                          client_fd, EPOLLIN, client_data);
+    } catch (...) {
+      delete client_data;
+      close(client_fd);
+      throw;
+    }
     current_worker++;
     if (current_worker == HttpServer::kThreadPoolSize) current_worker = 0;
   }

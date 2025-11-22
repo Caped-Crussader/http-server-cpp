@@ -60,6 +60,8 @@ std::string to_string(HttpStatusCode status_code) {
       return "OK";
     case HttpStatusCode::Accepted:
       return "Accepted";
+    case HttpStatusCode::NoContent:
+      return std::string();  // RFC 7231: No Content has no reason phrase
     case HttpStatusCode::MovedPermanently:
       return "Moved Permanently";
     case HttpStatusCode::Found:
@@ -183,6 +185,12 @@ HttpRequest string_to_request(const std::string& request_string) {
     rpos = request_string.length();
     if (lpos < rpos) {
       message_body = request_string.substr(lpos, rpos - lpos);
+    }
+  } else {
+    // Check if there's at least one more line after start line
+    if (lpos < request_string.length()) {
+      // Has header lines but no body separator - still valid for requests without body
+      header_lines = request_string.substr(lpos);
     }
   }
 
