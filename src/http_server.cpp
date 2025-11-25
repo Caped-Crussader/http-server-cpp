@@ -149,8 +149,8 @@ void HttpServer::ProcessEvents(int worker_id) {
         control_epoll_event(epoll_fd, EPOLL_CTL_DEL, data->fd);
         close(data->fd);
         delete data;
-      } else if ((current_event.events == EPOLLIN) ||
-                 (current_event.events == EPOLLOUT)) {
+      } else if ((current_event.events & EPOLLIN) ||
+                 (current_event.events & EPOLLOUT)) {
         HandleEpollEvent(epoll_fd, data, current_event.events);
       } else {  // something unexpected
         control_epoll_event(epoll_fd, EPOLL_CTL_DEL, data->fd);
@@ -170,6 +170,7 @@ void HttpServer::HandleEpollEvent(int epoll_fd, EventData *data,
     request = data;
     ssize_t byte_count = recv(fd, request->buffer, kMaxBufferSize, 0);
     if (byte_count > 0) {  // we have fully received the message
+      request->length = byte_count;
       response = new EventData();
       response->fd = fd;
       HandleHttpData(*request, response);
@@ -218,7 +219,7 @@ void HttpServer::HandleEpollEvent(int epoll_fd, EventData *data,
 
 void HttpServer::HandleHttpData(const EventData &raw_request,
                                 EventData *raw_response) {
-  std::string request_string(raw_request.buffer), response_string;
+  std::string request_string(raw_request.buffer, raw_request.length), response_string;
   HttpRequest http_request;
   HttpResponse http_response;
 

@@ -39,7 +39,7 @@ class Uri {
   std::string path_;
   std::string scheme_;
   std::string host_;
-  uint16_t port_;
+  uint16_t port_ = 0;
 };
 
 }  // namespace http_server

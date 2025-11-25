@@ -28,9 +28,9 @@ void ensure_enough_resource(int resource, std::uint32_t soft_limit,
   getrlimit(resource, &old_limit);
 
   std::cout << "Old limit: " << old_limit.rlim_cur << " (soft limit), "
-            << old_limit.rlim_cur << " (hard limit)." << std::endl;
+            << old_limit.rlim_max << " (hard limit)." << std::endl;
   std::cout << "New limit: " << new_limit.rlim_cur << " (soft limit), "
-            << new_limit.rlim_cur << " (hard limit)." << std::endl;
+            << new_limit.rlim_max << " (hard limit)." << std::endl;
 
   if (setrlimit(resource, &new_limit)) {
     std::cerr << "Warning: Could not update resource limit ";

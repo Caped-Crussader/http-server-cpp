@@ -82,6 +82,8 @@ std::string to_string(HttpStatusCode status_code) {
       return "Not Implemented";
     case HttpStatusCode::BadGateway:
       return "Bad Gateway";
+    case HttpStatusCode::HttpVersionNotSupported:
+      return "HTTP Version Not Supported";
     default:
       return std::string();
   }
@@ -213,13 +215,21 @@ HttpRequest string_to_request(const std::string& request_string) {
     std::getline(header_stream, key, ':');
     std::getline(header_stream, value);
 
-    // remove whitespaces from the two strings
+    // remove whitespaces from key and leading/trailing whitespace from value
     key.erase(std::remove_if(key.begin(), key.end(),
                              [](char c) { return std::isspace(c); }),
               key.end());
-    value.erase(std::remove_if(value.begin(), value.end(),
-                               [](char c) { return std::isspace(c); }),
-                value.end());
+    // Trim leading whitespace from value
+    auto value_start = std::find_if(value.begin(), value.end(),
+                                    [](char c) { return !std::isspace(c); });
+    // Trim trailing whitespace from value
+    auto value_end = std::find_if(value.rbegin(), value.rend(),
+                                  [](char c) { return !std::isspace(c); }).base();
+    if (value_start < value_end) {
+      value = std::string(value_start, value_end);
+    } else {
+      value.clear();
+    }
     request.SetHeader(key, value);
   }
 

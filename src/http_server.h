@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <sys/types.h>
 
+#include <atomic>
 #include <chrono>
 #include <functional>
 #include <map>
@@ -75,7 +76,7 @@ class HttpServer {
   std::string host_;
   std::uint16_t port_;
   int sock_fd_;
-  bool running_;
+  std::atomic<bool> running_;
   std::thread listener_thread_;
   std::thread worker_threads_[kThreadPoolSize];
   int worker_epoll_fd_[kThreadPoolSize];

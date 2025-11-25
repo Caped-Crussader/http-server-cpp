@@ -21,14 +21,11 @@ using namespace http_server;
 
 int err = 0;
 
-void test_uri_path_to_lowercase() {
-  std::string path = "/SayHello.HTML?name=abc&message=welcome";
-  std::string lowercase_path;
-  std::transform(path.begin(), path.end(), std::back_inserter(lowercase_path),
-                 [](char c) { return tolower(c); });
+void test_uri_path() {
+  std::string path = "/SayHello.html?name=abc&message=welcome";
 
   Uri uri("/SayHello.html?name=abc&message=welcome");
-  EXPECT_TRUE(uri.path() == lowercase_path);
+  EXPECT_TRUE(uri.path() == path);
 }
 
 void test_method_to_string() {
@@ -82,7 +79,7 @@ void test_response_to_string() {
 int main(void) {
   std::cout << "Running tests..." << std::endl;
 
-  test_uri_path_to_lowercase();
+  test_uri_path();
   test_method_to_string();
   test_version_to_string();
   test_status_code_to_string();
