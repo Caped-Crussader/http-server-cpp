@@ -54,7 +54,7 @@ void HttpServer::Start() {
   }
 
   SetUpEpoll();
-  running_ = true;
+  running_ = true;  // Set before starting threads to avoid race condition
   listener_thread_ = std::thread(&HttpServer::Listen, this);
   for (int i = 0; i < kThreadPoolSize; i++) {
     worker_threads_[i] = std::thread(&HttpServer::ProcessEvents, this, i);
@@ -116,7 +116,7 @@ void HttpServer::Listen() {
     } catch (...) {
       delete client_data;
       close(client_fd);
-      throw;
+      continue;  // Don't re-throw, just skip this connection and continue accepting
     }
     current_worker++;
     if (current_worker == HttpServer::kThreadPoolSize) current_worker = 0;
@@ -228,12 +228,15 @@ void HttpServer::HandleHttpData(const EventData &raw_request,
     http_response = HandleHttpRequest(http_request);
   } catch (const std::invalid_argument &e) {
     http_response = HttpResponse(HttpStatusCode::BadRequest);
+    http_response.SetHeader("Content-Type", "text/plain");
     http_response.SetContent(e.what());
   } catch (const std::logic_error &e) {
     http_response = HttpResponse(HttpStatusCode::HttpVersionNotSupported);
+    http_response.SetHeader("Content-Type", "text/plain");
     http_response.SetContent(e.what());
   } catch (const std::exception &e) {
     http_response = HttpResponse(HttpStatusCode::InternalServerError);
+    http_response.SetHeader("Content-Type", "text/plain");
     http_response.SetContent(e.what());
   }
 

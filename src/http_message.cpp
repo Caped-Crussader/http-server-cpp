@@ -211,6 +211,14 @@ HttpRequest string_to_request(const std::string& request_string) {
   iss.clear();  // parse header fields
   iss.str(header_lines);
   while (std::getline(iss, line)) {
+    // Remove trailing \r if present (HTTP uses \r\n line endings)
+    if (!line.empty() && line.back() == '\r') {
+      line.pop_back();
+    }
+    // Skip empty lines
+    if (line.empty()) {
+      continue;
+    }
     std::istringstream header_stream(line);
     std::getline(header_stream, key, ':');
     std::getline(header_stream, value);
@@ -219,6 +227,10 @@ HttpRequest string_to_request(const std::string& request_string) {
     key.erase(std::remove_if(key.begin(), key.end(),
                              [](char c) { return std::isspace(c); }),
               key.end());
+    // Skip if key is empty (malformed header line)
+    if (key.empty()) {
+      continue;
+    }
     // Trim leading whitespace from value
     auto value_start = std::find_if(value.begin(), value.end(),
                                     [](char c) { return !std::isspace(c); });

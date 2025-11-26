@@ -82,7 +82,7 @@ class HttpMessageInterface {
   HttpMessageInterface() : version_(HttpVersion::HTTP_1_1) {}
   virtual ~HttpMessageInterface() = default;
 
-  void SetHeader(const std::string& key, const std::string& value) {
+  void SetHeader(const std::string& key, std::string value) {
     headers_[key] = std::move(value);
   }
   void RemoveHeader(const std::string& key) { headers_.erase(key); }
