@@ -12,11 +12,13 @@
 #include <chrono>
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 #include <thread>
 #include <utility>
 
 #include "http_message.h"
+#include "memory_pool.h"
 #include "uri.h"
 
 namespace http_server {
@@ -24,6 +26,9 @@ namespace http_server {
 // Maximum size of an HTTP message is limited by how much bytes
 // we can read or send via socket each time
 constexpr size_t kMaxBufferSize = 4096;
+
+// Size of the memory pool for EventData objects per worker thread
+constexpr size_t kPoolSizePerWorker = 2000;
 
 struct EventData {
   EventData() : fd(0), length(0), cursor(0), buffer() {}
@@ -38,9 +43,8 @@ using HttpRequestHandler_t = std::function<HttpResponse(const HttpRequest&)>;
 
 // The server consists of:
 // - 1 main thread
-// - 1 listener thread that is responsible for accepting new connections
-// - Possibly many threads that process HTTP messages and communicate with
-// clients via socket.
+// - Multiple worker threads that each have their own listener socket (SO_REUSEPORT)
+//   and process HTTP messages using epoll. The kernel load-balances connections.
 //   The number of workers is defined by a constant
 class HttpServer {
  public:
@@ -75,21 +79,24 @@ class HttpServer {
 
   std::string host_;
   std::uint16_t port_;
-  int sock_fd_;
   std::atomic<bool> running_;
-  std::thread listener_thread_;
   std::thread worker_threads_[kThreadPoolSize];
+  int worker_sock_fd_[kThreadPoolSize];      // Each worker has its own listener socket (SO_REUSEPORT)
   int worker_epoll_fd_[kThreadPoolSize];
   epoll_event worker_events_[kThreadPoolSize][kMaxEvents];
+  std::unique_ptr<MemoryPool<EventData>> worker_pools_[kThreadPoolSize];  // Memory pools for EventData
   std::map<Uri, std::map<HttpMethod, HttpRequestHandler_t>> request_handlers_;
 
-  void CreateSocket();
+  void CreateSocket(int worker_id);
   void SetUpEpoll();
-  void Listen();
-  void ProcessEvents(int worker_id);
-  void HandleEpollEvent(int epoll_fd, EventData* event, std::uint32_t events);
-  void HandleHttpData(const EventData& request, EventData* response);
+  void WorkerThread(int worker_id);  // Combined listen + process for each worker
+  void HandleEpollEvent(int worker_id, int epoll_fd, EventData* event, std::uint32_t events);
+  void HandleHttpData(int worker_id, const EventData& request, EventData* response);
   HttpResponse HandleHttpRequest(const HttpRequest& request);
+
+  // Memory pool helpers
+  EventData* AcquireEventData(int worker_id);
+  void ReleaseEventData(int worker_id, EventData* data);
 
   void control_epoll_event(int epoll_fd, int op, int fd,
                            std::uint32_t events = 0, void* data = nullptr);
