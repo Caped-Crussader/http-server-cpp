@@ -8,6 +8,7 @@
 #include <cstddef>
 #include <memory>
 #include <new>
+#include <unordered_set>
 #include <vector>
 
 namespace http_server {
@@ -22,6 +23,8 @@ class MemoryPool {
     nodes_.reserve(pool_size);
     for (size_t i = 0; i < pool_size; ++i) {
       nodes_.emplace_back(std::unique_ptr<Node>(new Node()));
+      // Store data pointer for O(1) lookup
+      pool_data_ptrs_.insert(reinterpret_cast<T*>(nodes_.back()->data));
     }
     
     // Build the free list
@@ -90,6 +93,7 @@ class MemoryPool {
 
   size_t pool_size_;
   std::vector<std::unique_ptr<Node>> nodes_;
+  std::unordered_set<T*> pool_data_ptrs_;  // O(1) lookup for pool membership
   std::atomic<Node*> free_head_;
 
   // Lock-free pop from free list
@@ -118,14 +122,16 @@ class MemoryPool {
   }
 
   // Find the node containing this object (if it belongs to our pool)
+  // O(1) lookup using hash set instead of O(n) linear search
   Node* FindNode(T* obj) {
-    for (const auto& node_ptr : nodes_) {
-      T* data_ptr = reinterpret_cast<T*>(node_ptr->data);
-      if (obj == data_ptr) {
-        return node_ptr.get();
-      }
+    if (pool_data_ptrs_.find(obj) == pool_data_ptrs_.end()) {
+      return nullptr;  // Not from our pool
     }
-    return nullptr;  // Not from our pool
+    // Calculate node address from data pointer using offsetof-style arithmetic
+    // Node layout: [atomic<Node*> next][alignas(T) char data[sizeof(T)]]
+    char* data_addr = reinterpret_cast<char*>(obj);
+    char* node_addr = data_addr - offsetof(Node, data);
+    return reinterpret_cast<Node*>(node_addr);
   }
 };
 
