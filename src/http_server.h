@@ -25,7 +25,8 @@ namespace http_server {
 
 // Maximum size of an HTTP message is limited by how much bytes
 // we can read or send via socket each time
-constexpr size_t kMaxBufferSize = 4096;
+// 16KB is optimal for modern networks and aligns with typical TCP window sizes
+constexpr size_t kMaxBufferSize = 16384;
 
 // Size of the memory pool for EventData objects per worker thread
 constexpr size_t kPoolSizePerWorker = 2000;

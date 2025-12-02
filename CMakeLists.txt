@@ -7,6 +7,18 @@ project(http-server
     DESCRIPTION "A simple HTTP/1.1 server implementation in C++ using standard libraries"
     LANGUAGES CXX)
 
+# Optimization flags for Release builds
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG -march=native -flto")
+set(CMAKE_EXE_LINKER_FLAGS_RELEASE "-flto")
+
+# Enable warnings for Debug builds
+set(CMAKE_CXX_FLAGS_DEBUG "-g -O0 -Wall -Wextra -Wpedantic")
+
+# Default to Release build if not specified
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
+
 set(THREADS_PREFER_PTHREAD_FLAG ON)
 find_package(Threads REQUIRED)
 
