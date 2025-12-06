@@ -71,10 +71,13 @@ void HttpServer::CreateSocket(int worker_id) {
   }
 
   // Enable SO_REUSEADDR and SO_REUSEPORT for kernel load balancing
-  if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &opt,
-                 sizeof(opt)) < 0) {
+  if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0) {
     close(sock_fd);
-    throw std::runtime_error("Failed to set socket options");
+    throw std::runtime_error("Failed to set SO_REUSEADDR");
+  }
+  if (setsockopt(sock_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)) < 0) {
+    close(sock_fd);
+    throw std::runtime_error("Failed to set SO_REUSEPORT");
   }
 
   // Enable TCP_NODELAY for lower latency

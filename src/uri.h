@@ -25,7 +25,7 @@ class Uri {
     return path_ == other.path_;
   }
 
-  void SetPath(const std::string& path) {
+  void SetPath(std::string path) {
     path_ = std::move(path);
   }
 

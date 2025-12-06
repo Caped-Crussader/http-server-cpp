@@ -88,10 +88,10 @@ class HttpMessageInterface {
   void RemoveHeader(const std::string& key) { headers_.erase(key); }
   void ClearHeader() { headers_.clear(); }
   void SetContent(const std::string& content) {
-    content_ = std::move(content);
+    content_ = content;
     SetContentLength();
   }
-  void ClearContent(const std::string& content) {
+  void ClearContent() {
     content_.clear();
     SetContentLength();
   }
@@ -124,7 +124,7 @@ class HttpRequest : public HttpMessageInterface {
   ~HttpRequest() = default;
 
   void SetMethod(HttpMethod method) { method_ = method; }
-  void SetUri(const Uri& uri) { uri_ = std::move(uri); }
+  void SetUri(Uri uri) { uri_ = std::move(uri); }
 
   HttpMethod method() const { return method_; }
   Uri uri() const { return uri_; }
