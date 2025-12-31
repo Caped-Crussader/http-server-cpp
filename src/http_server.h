@@ -31,11 +31,17 @@ constexpr size_t kMaxBufferSize = 16384;
 // Size of the memory pool for EventData objects per worker thread
 constexpr size_t kPoolSizePerWorker = 2000;
 
+// Keep-alive timeout in seconds
+constexpr int kKeepAliveTimeout = 30;
+
 struct EventData {
-  EventData() : fd(0), length(0), cursor(0), buffer() {}
+  EventData() : fd(0), length(0), cursor(0), keep_alive(true), 
+                last_activity(std::chrono::steady_clock::now()), buffer() {}
   int fd;
   size_t length;
   size_t cursor;
+  bool keep_alive;
+  std::chrono::steady_clock::time_point last_activity;
   char buffer[kMaxBufferSize];
 };
 

@@ -140,6 +140,7 @@ void HttpServer::WorkerThread(int worker_id) {
     }
     if (nfds == 0) continue;
 
+    auto now = std::chrono::steady_clock::now();
     for (int i = 0; i < nfds; i++) {
       const epoll_event& current_event = worker_events_[worker_id][i];
 
@@ -172,6 +173,18 @@ void HttpServer::WorkerThread(int worker_id) {
       } else {
         // Handle client connection events
         EventData* data = reinterpret_cast<EventData*>(current_event.data.ptr);
+        
+        // Check for keep-alive timeout
+        auto idle_duration = std::chrono::duration_cast<std::chrono::seconds>(
+            now - data->last_activity).count();
+        if (idle_duration > kKeepAliveTimeout) {
+          // Connection has been idle too long, close it
+          control_epoll_event(epoll_fd, EPOLL_CTL_DEL, data->fd);
+          close(data->fd);
+          ReleaseEventData(worker_id, data);
+          continue;
+        }
+        
         if ((current_event.events & EPOLLHUP) || (current_event.events & EPOLLERR)) {
           control_epoll_event(epoll_fd, EPOLL_CTL_DEL, data->fd);
           close(data->fd);
@@ -207,6 +220,7 @@ void HttpServer::HandleEpollEvent(int worker_id, int epoll_fd, EventData *data,
     ssize_t byte_count = recv(fd, request->buffer, kMaxBufferSize, 0);
     if (byte_count > 0) {  // we have fully received the message
       request->length = byte_count;
+      request->last_activity = std::chrono::steady_clock::now();
       response = AcquireEventData(worker_id);
       response->fd = fd;
       HandleHttpData(worker_id, *request, response);
@@ -236,9 +250,17 @@ void HttpServer::HandleEpollEvent(int worker_id, int epoll_fd, EventData *data,
         response->length -= byte_count;
         control_epoll_event(epoll_fd, EPOLL_CTL_MOD, fd, EPOLLOUT, response);
       } else {  // we have written the complete message
-        request = AcquireEventData(worker_id);
-        request->fd = fd;
-        control_epoll_event(epoll_fd, EPOLL_CTL_MOD, fd, EPOLLIN, request);
+        if (response->keep_alive) {
+          // Keep connection open for next request
+          request = AcquireEventData(worker_id);
+          request->fd = fd;
+          request->last_activity = std::chrono::steady_clock::now();
+          control_epoll_event(epoll_fd, EPOLL_CTL_MOD, fd, EPOLLIN, request);
+        } else {
+          // Close connection
+          control_epoll_event(epoll_fd, EPOLL_CTL_DEL, fd);
+          close(fd);
+        }
         ReleaseEventData(worker_id, response);
       }
     } else {
@@ -258,22 +280,47 @@ void HttpServer::HandleHttpData(int worker_id, const EventData &raw_request,
   std::string request_string(raw_request.buffer, raw_request.length), response_string;
   HttpRequest http_request;
   HttpResponse http_response;
+  bool keep_alive = true;
 
   try {
     http_request = string_to_request(request_string);
+    
+    // Determine keep-alive based on HTTP version and Connection header
+    std::string conn_header = http_request.header("Connection");
+    std::transform(conn_header.begin(), conn_header.end(), conn_header.begin(),
+                   [](unsigned char c) { return std::tolower(c); });
+    
+    if (http_request.version() == HttpVersion::HTTP_1_0) {
+      // HTTP/1.0 defaults to close, unless Connection: keep-alive
+      keep_alive = (conn_header == "keep-alive");
+    } else {
+      // HTTP/1.1 defaults to keep-alive, unless Connection: close
+      keep_alive = (conn_header != "close");
+    }
+    
     http_response = HandleHttpRequest(http_request);
   } catch (const std::invalid_argument &e) {
     http_response = HttpResponse(HttpStatusCode::BadRequest);
     http_response.SetHeader("Content-Type", "text/plain");
     http_response.SetContent(e.what());
+    keep_alive = false;
   } catch (const std::logic_error &e) {
     http_response = HttpResponse(HttpStatusCode::HttpVersionNotSupported);
     http_response.SetHeader("Content-Type", "text/plain");
     http_response.SetContent(e.what());
+    keep_alive = false;
   } catch (const std::exception &e) {
     http_response = HttpResponse(HttpStatusCode::InternalServerError);
     http_response.SetHeader("Content-Type", "text/plain");
     http_response.SetContent(e.what());
+    keep_alive = false;
+  }
+
+  // Set Connection header in response
+  if (keep_alive) {
+    http_response.SetHeader("Connection", "keep-alive");
+  } else {
+    http_response.SetHeader("Connection", "close");
   }
 
   // Set response to write to client
@@ -282,6 +329,7 @@ void HttpServer::HandleHttpData(int worker_id, const EventData &raw_request,
   size_t copy_length = std::min(response_string.length(), kMaxBufferSize);
   memcpy(raw_response->buffer, response_string.c_str(), copy_length);
   raw_response->length = copy_length;
+  raw_response->keep_alive = keep_alive;
 }
 
 HttpResponse HttpServer::HandleHttpRequest(const HttpRequest &request) {
